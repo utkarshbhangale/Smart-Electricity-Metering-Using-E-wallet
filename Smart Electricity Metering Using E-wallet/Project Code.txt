@@ -1,0 +1,119 @@
+#include <LiquidCrystal.h>
+LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
+#include "ACS712.h"
+
+const int relay =  13; 
+long milisec = millis(); // calculate time in milliseconds
+long tim=milisec/1000; // convert milliseconds to seconds
+int m=0;
+float x=0;
+float w=0;
+float e=0;
+float cost=0;
+float cash=200;
+ACS712 sensor(ACS712_20A, A0);
+
+void gsm_user()
+{
+   Serial.print("AT\r\n");                                    // Transmit AT to the module           
+   delay(500);
+   Serial.print("ATE1\r\n");                                  // Echo Off                            
+   delay(500);  
+   Serial.print("AT+CMGF=1\r\n");                             // Switch to text mode                 
+   delay(100);   
+   Serial.print("AT+CSMP=17,167,0,0\r\n");
+   delay(100);
+   Serial.print("AT+CMGS=\"+919763430690\"\r\n");             // Send SMS to a cell number           
+   delay(500);  // wait for a 500ms delay
+}
+
+void gsm_mseb()
+{
+   Serial.print("AT\r\n");                                    // Transmit AT to the module           
+   delay(500);
+   Serial.print("ATE1\r\n");                                  // Echo Off                            
+   delay(500);  
+   Serial.print("AT+CMGF=1\r\n");                             // Switch to text mode                 
+   delay(100);   
+   Serial.print("AT+CSMP=17,167,0,0\r\n");
+   delay(100);
+   Serial.print("AT+CMGS=\"+919763430690\"\r\n");             // Send SMS to a cell number           
+   delay(500);  // wait for a 500ms delay
+}
+
+void setup() 
+{
+  Serial.begin(9600);
+  pinMode(relay, OUTPUT);
+  lcd.begin(16, 2);
+  lcd.print("Smart Meter");
+  delay(3000);
+  lcd.clear();
+  sensor.calibrate();
+  cost=cash;
+  digitalWrite(relay, HIGH);
+}
+
+void loop() 
+{  
+  float U = 230;
+  for(m=0;m<60;m++)
+  {
+    float I =sensor.getCurrentAC(); 
+    float P = U * I;
+    float energy=(P)/60;
+    lcd.clear();  
+    lcd.print(String("Watt:") + P + " Watts");
+    e+=energy;
+    lcd.setCursor(0,2);
+    lcd.print(String("Energy:") + e + "Wpm");
+    delay(1000);
+  }
+  x=e/5;
+  w=x*7;
+  lcd.clear();  
+  lcd.print(String("Units:") + x);
+  lcd.setCursor(0,2);
+  lcd.print(String("Bill:Rs") + w );
+  gsm_user();
+  Serial.println("Your Meter Reading & Bill is");
+  Serial.println(String("Units:") + x);
+  Serial.println(String("Bill:Rs") + w );
+  Serial.print((char)26);                                      // Ctrl-Z indicates end of SMS    
+  delay(2000);
+  gsm_mseb();
+  Serial.println("For MSEB Meter no.102 Reading & Bill is");
+  Serial.println(String("Units:") + x);
+  Serial.println(String("Bill:Rs") + w );
+  Serial.print((char)26);                                      // Ctrl-Z indicates end of SMS    
+  delay(2000);
+  delay(8000);
+  if(cost>w)
+  {
+    cost=cost-w;
+    lcd.clear();  
+    lcd.print(String("Remain:Rs") + cost);
+    delay(8000);
+    x=0;
+    e=0;
+    digitalWrite(relay, HIGH);
+  }  
+  else if(cost<w)
+  {
+    lcd.clear();  
+    lcd.print("Electricity");
+    lcd.setCursor(0,2);
+    lcd.print("Will Cut");
+    delay(8000);
+    digitalWrite(relay, LOW);    
+    lcd.clear();  
+    lcd.print("Recharge ");
+    lcd.setCursor(0,2);
+    lcd.print("Electric Meter");
+    gsm_user();
+    Serial.println("Your Account Balance is Low");
+    Serial.print((char)26);                                      // Ctrl-Z indicates end of SMS    
+    delay(2000);
+    while(1);
+  }
+}
